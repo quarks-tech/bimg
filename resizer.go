@@ -636,23 +636,27 @@ func getAngle(angle Angle) Angle {
 }
 
 func applyBrightness(image *C.VipsImage, o Options) (*C.VipsImage, error) {
-	var err error
-	if o.Brightness != 0 {
-		image, err = vipsBrightness(image, o.Brightness)
-		if err != nil {
-			return nil, err
-		}
+	if o.Brightness == 0 {
+		return image, nil
 	}
+
+	image, err := vipsBrightness(image, o.Brightness)
+	if err != nil {
+		return nil, err
+	}
+
 	return image, nil
 }
 
 func applyContrast(image *C.VipsImage, o Options) (*C.VipsImage, error) {
-	var err error
-	if o.Contrast > 0 {
-		image, err = vipsContrast(image, o.Contrast)
-		if err != nil {
-			return nil, err
-		}
+	if o.Contrast <= 0 {
+		return image, nil
 	}
+
+	image, err := vipsContrast(image, o.Contrast)
+	if err != nil {
+		return nil, err
+	}
+
 	return image, nil
 }

@@ -160,7 +160,7 @@ func VipsVectorSetEnabled(enable bool) {
 
 // VipsDebugInfo outputs to stdout libvips collected data. Useful for debugging.
 func VipsDebugInfo() {
-	C.vips_object_print_all()
+	C.im__print_all()
 }
 
 // VipsMemory gets memory info stats from libvips (cache size, memory allocs...)
@@ -249,9 +249,8 @@ func vipsExifOrientation(image *C.VipsImage) int {
 }
 
 func vipsExifShort(s string) string {
-	i := strings.Index(s, " (")
-	if i > 0 {
-		return s[:i]
+	if strings.Contains(s, " (") {
+		return s[:strings.Index(s, "(")-1]
 	}
 	return s
 }
@@ -459,7 +458,6 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 		if int(err) != 0 {
 			return nil, catchVipsError()
 		}
-		C.g_object_unref(C.gpointer(image))
 		image = outImage
 	}
 
