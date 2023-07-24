@@ -27,6 +27,13 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 		return nil, err
 	}
 
+	unref := true
+	defer func() {
+		if unref {
+			C.g_object_unref(C.gpointer(image))
+		}
+	}()
+
 	// Clone and define default options
 	o = applyDefaults(o, imageType)
 
@@ -47,8 +54,6 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 	// Auto rotate image based on EXIF orientation header
 	image, rotated, err := rotateAndFlipImage(image, o)
 	if err != nil {
-		C.g_object_unref(C.gpointer(image))
-
 		return nil, err
 	}
 
@@ -87,11 +92,13 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 	supportsShrinkOnLoad := imageType == WEBP && VipsMajorVersion >= 8 && (VipsMinorVersion >= 3 && VipsMinorVersion <= 6)
 	supportsShrinkOnLoad = supportsShrinkOnLoad || imageType == JPEG
 	if supportsShrinkOnLoad && shrink >= 2 {
-		image, factor, err = shrinkOnLoad(buf, image, imageType, factor, shrink)
+		tmpImage, factor, err := shrinkOnLoad(buf, image, imageType, factor, shrink)
 		if err != nil {
 			return nil, err
 		}
 
+		C.g_object_unref(C.gpointer(image))
+		image = tmpImage
 		factor = math.Max(factor, 1.0)
 		shrink = int(math.Floor(factor))
 		residual = float64(shrink) / factor
@@ -154,6 +161,8 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	unref = false
 
 	return saveImage(image, o)
 }
@@ -565,7 +574,7 @@ func calculateRotationAndFlip(image *C.VipsImage, angle Angle) (Angle, bool) {
 	flip := false
 
 	if angle > 0 {
-		return rotate, flip
+		return rotate, false
 	}
 
 	switch vipsExifOrientation(image) {
