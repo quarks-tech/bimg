@@ -92,13 +92,11 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 	supportsShrinkOnLoad := imageType == WEBP && VipsMajorVersion >= 8 && (VipsMinorVersion >= 3 && VipsMinorVersion <= 6)
 	supportsShrinkOnLoad = supportsShrinkOnLoad || imageType == JPEG
 	if supportsShrinkOnLoad && shrink >= 2 {
-		tmpImage, factor, err := shrinkOnLoad(buf, image, imageType, factor, shrink)
+		image, factor, err = shrinkOnLoad(buf, image, imageType, factor, shrink)
 		if err != nil {
 			return nil, err
 		}
 
-		C.g_object_unref(C.gpointer(image))
-		image = tmpImage
 		factor = math.Max(factor, 1.0)
 		shrink = int(math.Floor(factor))
 		residual = float64(shrink) / factor
