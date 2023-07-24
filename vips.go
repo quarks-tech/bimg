@@ -381,6 +381,8 @@ func vipsRead(buf []byte) (*C.VipsImage, ImageType, error) {
 
 	err := C.vips_init_image(imageBuf, length, C.int(imageType), &image)
 	if err != 0 {
+		C.g_object_unref(C.gpointer(image))
+
 		return nil, UNKNOWN, catchVipsError()
 	}
 
@@ -415,7 +417,12 @@ func vipsInterpretation(image *C.VipsImage) Interpretation {
 }
 
 func vipsFlattenBackground(image *C.VipsImage, background Color) (*C.VipsImage, error) {
+	if !vipsHasAlpha(image) {
+		return image, nil
+	}
+
 	var outImage *C.VipsImage
+	defer C.g_object_unref(C.gpointer(image))
 
 	backgroundC := [3]C.double{
 		C.double(background.R),
@@ -423,17 +430,14 @@ func vipsFlattenBackground(image *C.VipsImage, background Color) (*C.VipsImage, 
 		C.double(background.B),
 	}
 
-	if vipsHasAlpha(image) {
-		err := C.vips_flatten_background_brigde(image, &outImage,
-			backgroundC[0], backgroundC[1], backgroundC[2])
-		if int(err) != 0 {
-			return nil, catchVipsError()
-		}
-		C.g_object_unref(C.gpointer(image))
-		image = outImage
+	err := C.vips_flatten_background_brigde(image, &outImage,
+		backgroundC[0], backgroundC[1], backgroundC[2])
+
+	if int(err) != 0 {
+		return nil, catchVipsError()
 	}
 
-	return image, nil
+	return outImage, nil
 }
 
 func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
@@ -455,7 +459,7 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 		if int(err) != 0 {
 			return nil, catchVipsError()
 		}
-		C.g_object_unref(C.gpointer(image))
+		//C.g_object_unref(C.gpointer(image))
 		image = outImage
 	}
 
