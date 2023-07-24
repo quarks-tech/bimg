@@ -374,11 +374,10 @@ func vipsRead(buf []byte) (*C.VipsImage, ImageType, error) {
 		return nil, UNKNOWN, errors.New("Unsupported image format")
 	}
 
-	var (
-		image    *C.VipsImage
-		length   = C.size_t(len(buf))
-		imageBuf = unsafe.Pointer(&buf[0])
-	)
+	length := C.size_t(len(buf))
+	imageBuf := unsafe.Pointer(&buf[0])
+
+	var image *C.VipsImage
 
 	err := C.vips_init_image(imageBuf, length, C.int(imageType), &image)
 	if err != 0 {
