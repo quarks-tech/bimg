@@ -466,11 +466,6 @@ func shrinkImage(image *C.VipsImage, o Options, residual float64, shrink int) (*
 }
 
 func shrinkOnLoad(buf []byte, input *C.VipsImage, imageType ImageType, factor float64, shrink int) (*C.VipsImage, float64, error) {
-	var (
-		image *C.VipsImage
-		err   error
-	)
-
 	if shrink < 2 {
 		return nil, 0, fmt.Errorf("only available for shrink >=2")
 	}
@@ -488,6 +483,11 @@ func shrinkOnLoad(buf []byte, input *C.VipsImage, imageType ImageType, factor fl
 		factor = factor / 2
 		shrinkOnLoad = 2
 	}
+
+	var (
+		image *C.VipsImage
+		err   error
+	)
 
 	// Reload input using shrink-on-load
 	switch imageType {
