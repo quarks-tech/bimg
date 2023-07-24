@@ -27,7 +27,7 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 		return nil, err
 	}
 
-	unref := true
+	unref := false
 	defer func() {
 		if unref {
 			C.g_object_unref(C.gpointer(image))
