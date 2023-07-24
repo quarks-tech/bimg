@@ -48,6 +48,9 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		unref = false
+
 		return saveImage(image, o)
 	}
 
