@@ -381,8 +381,6 @@ func vipsRead(buf []byte) (*C.VipsImage, ImageType, error) {
 
 	err := C.vips_init_image(imageBuf, length, C.int(imageType), &image)
 	if err != 0 {
-		C.g_object_unref(C.gpointer(image))
-
 		return nil, UNKNOWN, catchVipsError()
 	}
 
