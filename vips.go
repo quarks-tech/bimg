@@ -237,17 +237,11 @@ func VipsIsTypeSupportedSave(t ImageType) bool {
 }
 
 func vipsExifStringTag(image *C.VipsImage, tag string) string {
-	t := C.CString(tag)
-	defer C.free(unsafe.Pointer(t))
-
-	return vipsExifShort(C.GoString(C.vips_exif_tag(image, t)))
+	return vipsExifShort(C.GoString(C.vips_exif_tag(image, C.CString(tag))))
 }
 
 func vipsExifIntTag(image *C.VipsImage, tag string) int {
-	t := C.CString(tag)
-	defer C.free(unsafe.Pointer(t))
-
-	return int(C.vips_exif_tag_to_int(image, t))
+	return int(C.vips_exif_tag_to_int(image, C.CString(tag)))
 }
 
 func vipsExifOrientation(image *C.VipsImage) int {
