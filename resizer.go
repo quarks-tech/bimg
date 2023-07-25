@@ -88,7 +88,6 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 			return nil, err
 		}
 
-		C.g_object_unref(C.gpointer(image))
 		image = tmpImage
 		factor = math.Max(factor, 1.0)
 		shrink = int(math.Floor(factor))
