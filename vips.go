@@ -398,7 +398,9 @@ func vipsColourspaceIsSupportedBuffer(buf []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	C.g_object_unref(C.gpointer(image))
+
+	defer C.g_object_unref(C.gpointer(image))
+
 	return vipsColourspaceIsSupported(image), nil
 }
 
@@ -411,9 +413,10 @@ func vipsInterpretationBuffer(buf []byte) (Interpretation, error) {
 	if err != nil {
 		return InterpretationError, err
 	}
-	interp := vipsInterpretation(image)
-	C.g_object_unref(C.gpointer(image))
-	return interp, nil
+
+	defer C.g_object_unref(C.gpointer(image))
+
+	return vipsInterpretation(image), nil
 }
 
 func vipsInterpretation(image *C.VipsImage) Interpretation {
@@ -457,6 +460,7 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 		if int(err) != 0 {
 			return nil, catchVipsError()
 		}
+		C.g_object_unref(C.gpointer(image))
 		image = outImage
 	}
 
@@ -471,7 +475,7 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 		if int(err) != 0 {
 			return nil, catchVipsError()
 		}
-
+		C.g_object_unref(C.gpointer(image))
 		return outImage, nil
 	}
 
@@ -483,7 +487,7 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 		if int(err) != 0 {
 			return nil, catchVipsError()
 		}
-
+		C.g_object_unref(C.gpointer(image))
 		image = outImage
 	}
 
