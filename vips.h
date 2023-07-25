@@ -2,7 +2,6 @@
 #include <string.h>
 #include <vips/vips.h>
 #include <vips/foreign.h>
-#include <vips/vips7compat.h>
 #include <vips/vector.h>
 
 /**
@@ -666,26 +665,16 @@ vips_smartcrop_bridge(VipsImage *in, VipsImage **out, int width, int height) {
 #endif
 }
 
-int vips_find_trim_bridge(VipsImage *in, int *top, int *left, int *width, int *height, double threshold) {
+int vips_find_trim_bridge(VipsImage *in, int *top, int *left, int *width, int *height, double r, double g, double b, double threshold) {
 #if (VIPS_MAJOR_VERSION >= 8 && VIPS_MINOR_VERSION >= 6)
-    double *vector;
-    int n;
-
-    if( vips_getpoint( in, &vector, &n, 0, 0, NULL ) )
-    		return( -1 );
-
 	if (vips_is_16bit(in->Type)) {
-		vector[0] = 65535 * vector[0] / 255;
-		vector[1] = 65535 * vector[1] / 255;
-		vector[2] = 65535 * vector[2] / 255;
+		r = 65535 * r / 255;
+		g = 65535 * g / 255;
+		b = 65535 * b / 255;
 	}
 
-	double background[3] = {vector[0], vector[1], vector[2]};
-
-	g_free( vector );
-
+	double background[3] = {r, g, b};
 	VipsArrayDouble *vipsBackground = vips_array_double_new(background, 3);
-
 	return vips_find_trim(in, top, left, width, height, "background", vipsBackground, "threshold", threshold, NULL);
 #else
 	return 0;
