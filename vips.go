@@ -237,11 +237,17 @@ func VipsIsTypeSupportedSave(t ImageType) bool {
 }
 
 func vipsExifStringTag(image *C.VipsImage, tag string) string {
-	return vipsExifShort(C.GoString(C.vips_exif_tag(image, C.CString(tag))))
+	t := C.CString(tag)
+	defer C.free(unsafe.Pointer(t))
+
+	return vipsExifShort(C.GoString(C.vips_exif_tag(image, t)))
 }
 
 func vipsExifIntTag(image *C.VipsImage, tag string) int {
-	return int(C.vips_exif_tag_to_int(image, C.CString(tag)))
+	t := C.CString(tag)
+	defer C.free(unsafe.Pointer(t))
+
+	return int(C.vips_exif_tag_to_int(image, t))
 }
 
 func vipsExifOrientation(image *C.VipsImage) int {
@@ -280,6 +286,8 @@ func vipsRotate(image *C.VipsImage, angle Angle) (*C.VipsImage, error) {
 
 	err := C.vips_rotate_bridge(image, &out, C.int(angle))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 
@@ -292,13 +300,15 @@ func vipsAutoRotate(image *C.VipsImage) (*C.VipsImage, error) {
 
 	err := C.vips_autorot_bridge(image, &out)
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 
 	return out, nil
 }
 
-func vipsTransformICC(image *C.VipsImage, inputICC string, outputICC string) (*C.VipsImage, error) {
+func vipsTransformICC(image *C.VipsImage, inputICC, outputICC string) (*C.VipsImage, error) {
 	var out *C.VipsImage
 	defer C.g_object_unref(C.gpointer(image))
 
@@ -307,8 +317,10 @@ func vipsTransformICC(image *C.VipsImage, inputICC string, outputICC string) (*C
 	inputIccPath := C.CString(inputICC)
 	defer C.free(unsafe.Pointer(inputIccPath))
 	err := C.vips_icc_transform_with_default_bridge(image, &out, outputIccPath, inputIccPath)
-	//err := C.vips_icc_transform_bridge2(image, &outImage, outputIccPath, inputIccPath)
+	// err := C.vips_icc_transform_bridge2(image, &outImage, outputIccPath, inputIccPath)
 	if int(err) != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 
@@ -321,6 +333,8 @@ func vipsFlip(image *C.VipsImage, direction Direction) (*C.VipsImage, error) {
 
 	err := C.vips_flip_bridge(image, &out, C.int(direction))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 
@@ -333,6 +347,8 @@ func vipsZoom(image *C.VipsImage, zoom int) (*C.VipsImage, error) {
 
 	err := C.vips_zoom_bridge(image, &out, C.int(zoom), C.int(zoom))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 
@@ -341,6 +357,7 @@ func vipsZoom(image *C.VipsImage, zoom int) (*C.VipsImage, error) {
 
 func vipsWatermark(image *C.VipsImage, w Watermark) (*C.VipsImage, error) {
 	var out *C.VipsImage
+	defer C.g_object_unref(C.gpointer(image))
 
 	// Defaults
 	noReplicate := 0
@@ -360,6 +377,8 @@ func vipsWatermark(image *C.VipsImage, w Watermark) (*C.VipsImage, error) {
 
 	err := C.vips_watermark(image, &out, (*C.WatermarkTextOptions)(unsafe.Pointer(&textOpts)), (*C.WatermarkOptions)(unsafe.Pointer(&opts)))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 
@@ -367,18 +386,21 @@ func vipsWatermark(image *C.VipsImage, w Watermark) (*C.VipsImage, error) {
 }
 
 func vipsRead(buf []byte) (*C.VipsImage, ImageType, error) {
-	var image *C.VipsImage
 	imageType := vipsImageType(buf)
 
 	if imageType == UNKNOWN {
 		return nil, UNKNOWN, errors.New("Unsupported image format")
 	}
 
+	var image *C.VipsImage
+
 	length := C.size_t(len(buf))
 	imageBuf := unsafe.Pointer(&buf[0])
 
 	err := C.vips_init_image(imageBuf, length, C.int(imageType), &image)
 	if err != 0 {
+		C.g_object_unref(C.gpointer(image))
+
 		return nil, UNKNOWN, catchVipsError()
 	}
 
@@ -390,8 +412,10 @@ func vipsColourspaceIsSupportedBuffer(buf []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	supported := vipsColourspaceIsSupported(image)
 	C.g_object_unref(C.gpointer(image))
-	return vipsColourspaceIsSupported(image), nil
+
+	return supported, nil
 }
 
 func vipsColourspaceIsSupported(image *C.VipsImage) bool {
@@ -413,6 +437,10 @@ func vipsInterpretation(image *C.VipsImage) Interpretation {
 }
 
 func vipsFlattenBackground(image *C.VipsImage, background Color) (*C.VipsImage, error) {
+	if !vipsHasAlpha(image) {
+		return image, nil
+	}
+
 	var outImage *C.VipsImage
 
 	backgroundC := [3]C.double{
@@ -421,15 +449,17 @@ func vipsFlattenBackground(image *C.VipsImage, background Color) (*C.VipsImage, 
 		C.double(background.B),
 	}
 
-	if vipsHasAlpha(image) {
-		err := C.vips_flatten_background_brigde(image, &outImage,
-			backgroundC[0], backgroundC[1], backgroundC[2])
-		if int(err) != 0 {
-			return nil, catchVipsError()
-		}
+	err := C.vips_flatten_background_brigde(image, &outImage,
+		backgroundC[0], backgroundC[1], backgroundC[2])
+	if int(err) != 0 {
 		C.g_object_unref(C.gpointer(image))
-		image = outImage
+		C.g_object_unref(C.gpointer(outImage))
+
+		return nil, catchVipsError()
 	}
+
+	C.g_object_unref(C.gpointer(image))
+	image = outImage
 
 	return image, nil
 }
@@ -453,6 +483,8 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 		if int(err) != 0 {
 			return nil, catchVipsError()
 		}
+
+		C.g_object_unref(C.gpointer(image))
 		image = outImage
 	}
 
@@ -576,6 +608,8 @@ func vipsExtract(image *C.VipsImage, left, top, width, height int) (*C.VipsImage
 	top, left = max(top), max(left)
 	err := C.vips_extract_area_bridge(image, &buf, C.int(left), C.int(top), C.int(width), C.int(height))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(buf))
+
 		return nil, catchVipsError()
 	}
 
@@ -592,13 +626,15 @@ func vipsSmartCrop(image *C.VipsImage, width, height int) (*C.VipsImage, error) 
 
 	err := C.vips_smartcrop_bridge(image, &buf, C.int(width), C.int(height))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(buf))
+
 		return nil, catchVipsError()
 	}
 
 	return buf, nil
 }
 
-func vipsTrim(image *C.VipsImage, background Color, threshold float64) (int, int, int, int, error) {
+func vipsTrim(image *C.VipsImage, threshold float64) (int, int, int, int, error) {
 	defer C.g_object_unref(C.gpointer(image))
 
 	top := C.int(0)
@@ -606,10 +642,7 @@ func vipsTrim(image *C.VipsImage, background Color, threshold float64) (int, int
 	width := C.int(0)
 	height := C.int(0)
 
-	err := C.vips_find_trim_bridge(image,
-		&top, &left, &width, &height,
-		C.double(background.R), C.double(background.G), C.double(background.B),
-		C.double(threshold))
+	err := C.vips_find_trim_bridge(image, &top, &left, &width, &height, C.double(threshold))
 	if err != 0 {
 		return 0, 0, 0, 0, catchVipsError()
 	}
@@ -619,11 +652,13 @@ func vipsTrim(image *C.VipsImage, background Color, threshold float64) (int, int
 
 func vipsShrinkJpeg(buf []byte, input *C.VipsImage, shrink int) (*C.VipsImage, error) {
 	var image *C.VipsImage
-	var ptr = unsafe.Pointer(&buf[0])
+	ptr := unsafe.Pointer(&buf[0])
 	defer C.g_object_unref(C.gpointer(input))
 
 	err := C.vips_jpegload_buffer_shrink(ptr, C.size_t(len(buf)), &image, C.int(shrink))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(image))
+
 		return nil, catchVipsError()
 	}
 
@@ -632,11 +667,13 @@ func vipsShrinkJpeg(buf []byte, input *C.VipsImage, shrink int) (*C.VipsImage, e
 
 func vipsShrinkWebp(buf []byte, input *C.VipsImage, shrink int) (*C.VipsImage, error) {
 	var image *C.VipsImage
-	var ptr = unsafe.Pointer(&buf[0])
+	ptr := unsafe.Pointer(&buf[0])
 	defer C.g_object_unref(C.gpointer(input))
 
 	err := C.vips_webpload_buffer_shrink(ptr, C.size_t(len(buf)), &image, C.int(shrink))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(image))
+
 		return nil, catchVipsError()
 	}
 
@@ -649,18 +686,22 @@ func vipsShrink(input *C.VipsImage, shrink int) (*C.VipsImage, error) {
 
 	err := C.vips_shrink_bridge(input, &image, C.double(float64(shrink)), C.double(float64(shrink)))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(image))
+
 		return nil, catchVipsError()
 	}
 
 	return image, nil
 }
 
-func vipsReduce(input *C.VipsImage, xshrink float64, yshrink float64) (*C.VipsImage, error) {
+func vipsReduce(input *C.VipsImage, xshrink, yshrink float64) (*C.VipsImage, error) {
 	var image *C.VipsImage
 	defer C.g_object_unref(C.gpointer(input))
 
 	err := C.vips_reduce_bridge(input, &image, C.double(xshrink), C.double(yshrink))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(image))
+
 		return nil, catchVipsError()
 	}
 
@@ -679,6 +720,8 @@ func vipsEmbed(input *C.VipsImage, left, top, width, height int, extend Extend, 
 	err := C.vips_embed_bridge(input, &image, C.int(left), C.int(top), C.int(width),
 		C.int(height), C.int(extend), C.double(background.R), C.double(background.G), C.double(background.B))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(image))
+
 		return nil, catchVipsError()
 	}
 
@@ -700,6 +743,8 @@ func vipsAffine(input *C.VipsImage, residualx, residualy float64, i Interpolator
 
 	err := C.vips_affine_interpolator(input, &image, C.double(residualx), 0, 0, C.double(residualy), interpolator, C.int(extend))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(image))
+
 		return nil, catchVipsError()
 	}
 
@@ -798,6 +843,8 @@ func vipsGaussianBlur(image *C.VipsImage, o GaussianBlur) (*C.VipsImage, error) 
 
 	err := C.vips_gaussblur_bridge(image, &out, C.double(o.Sigma), C.double(o.MinAmpl))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 	return out, nil
@@ -809,6 +856,8 @@ func vipsSharpen(image *C.VipsImage, o Sharpen) (*C.VipsImage, error) {
 
 	err := C.vips_sharpen_bridge(image, &out, C.int(o.Radius), C.double(o.X1), C.double(o.Y2), C.double(o.Y3), C.double(o.M1), C.double(o.M2))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 	return out, nil
@@ -819,18 +868,23 @@ func max(x int) int {
 }
 
 func vipsDrawWatermark(image *C.VipsImage, o WatermarkImage) (*C.VipsImage, error) {
-	var out *C.VipsImage
-
 	watermark, _, e := vipsRead(o.Buf)
 	if e != nil {
 		return nil, e
 	}
+
+	defer C.g_object_unref(C.gpointer(image))
+	defer C.g_object_unref(C.gpointer(watermark))
+
+	var out *C.VipsImage
 
 	opts := vipsWatermarkImageOptions{C.int(o.Left), C.int(o.Top), C.float(o.Opacity)}
 
 	err := C.vips_watermark_image(image, watermark, &out, (*C.WatermarkImageOptions)(unsafe.Pointer(&opts)))
 
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 
@@ -843,6 +897,8 @@ func vipsGamma(image *C.VipsImage, Gamma float64) (*C.VipsImage, error) {
 
 	err := C.vips_gamma_bridge(image, &out, C.double(Gamma))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 	return out, nil
@@ -854,6 +910,8 @@ func vipsBrightness(image *C.VipsImage, brightness float64) (*C.VipsImage, error
 
 	err := C.vips_brightness_bridge(image, &out, C.double(brightness))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 	return out, nil
@@ -865,6 +923,8 @@ func vipsContrast(image *C.VipsImage, contrast float64) (*C.VipsImage, error) {
 
 	err := C.vips_contrast_bridge(image, &out, C.double(contrast))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(out))
+
 		return nil, catchVipsError()
 	}
 	return out, nil

@@ -12,10 +12,8 @@ import (
 	"math"
 )
 
-var (
-	// ErrExtractAreaParamsRequired defines a generic extract area error
-	ErrExtractAreaParamsRequired = errors.New("extract area width/height params are required")
-)
+// ErrExtractAreaParamsRequired defines a generic extract area error
+var ErrExtractAreaParamsRequired = errors.New("extract area width/height params are required")
 
 // resizer is used to transform a given image as byte buffer
 // with the passed options.
@@ -316,7 +314,7 @@ func extractOrEmbedImage(image *C.VipsImage, o Options) (*C.VipsImage, error) {
 		image, err = vipsEmbed(image, left, top, o.Width, o.Height, o.Extend, o.Background)
 		break
 	case o.Trim:
-		left, top, width, height, err := vipsTrim(image, o.Background, o.Threshold)
+		left, top, width, height, err := vipsTrim(image, o.Threshold)
 		if err == nil {
 			image, err = vipsExtract(image, left, top, width, height)
 		}
@@ -411,7 +409,6 @@ func watermarkImageWithAnotherImage(image *C.VipsImage, w WatermarkImage) (*C.Vi
 	}
 
 	image, err := vipsDrawWatermark(image, w)
-
 	if err != nil {
 		return nil, err
 	}

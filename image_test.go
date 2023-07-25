@@ -261,7 +261,6 @@ func TestImageWatermarkWithImage(t *testing.T) {
 	}
 
 	buf, err := image.WatermarkImage(WatermarkImage{Left: 100, Top: 100, Buf: watermark})
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -502,7 +501,6 @@ func TestFluentInterface(t *testing.T) {
 }
 
 func TestImageSmartCrop(t *testing.T) {
-
 	if !(VipsMajorVersion >= 8 && VipsMinorVersion >= 5) {
 		t.Skipf("Skipping this test, libvips doesn't meet version requirement %s >= 8.5", VipsVersion)
 	}
@@ -522,7 +520,6 @@ func TestImageSmartCrop(t *testing.T) {
 }
 
 func TestImageTrim(t *testing.T) {
-
 	if !(VipsMajorVersion >= 8 && VipsMinorVersion >= 6) {
 		t.Skipf("Skipping this test, libvips doesn't meet version requirement %s >= 8.6", VipsVersion)
 	}
@@ -542,7 +539,6 @@ func TestImageTrim(t *testing.T) {
 }
 
 func TestImageTrimParameters(t *testing.T) {
-
 	if !(VipsMajorVersion >= 8 && VipsMinorVersion >= 6) {
 		t.Skipf("Skipping this test, libvips doesn't meet version requirement %s >= 8.6", VipsVersion)
 	}

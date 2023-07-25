@@ -645,7 +645,6 @@ func TestSkipCropIfTooSmall(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			croppedImage, err := Resize(testImgByte, tc.options)
 			if err != nil {
 				t.Fatal(err)
