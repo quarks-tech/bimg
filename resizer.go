@@ -88,6 +88,7 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 			return nil, err
 		}
 
+		C.g_object_unref(C.gpointer(image))
 		image = tmpImage
 		factor = math.Max(factor, 1.0)
 		shrink = int(math.Floor(factor))
@@ -315,9 +316,13 @@ func extractOrEmbedImage(image *C.VipsImage, o Options) (*C.VipsImage, error) {
 		break
 	case o.Trim:
 		left, top, width, height, err := vipsTrim(image, o.Threshold)
-		if err == nil {
-			image, err = vipsExtract(image, left, top, width, height)
+		if err != nil {
+			C.g_object_unref(C.gpointer(image))
+
+			return nil, err
 		}
+
+		image, err = vipsExtract(image, left, top, width, height)
 		break
 	case o.Top != 0 || o.Left != 0 || o.AreaWidth != 0 || o.AreaHeight != 0:
 		if o.AreaWidth == 0 {
