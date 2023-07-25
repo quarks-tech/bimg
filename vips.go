@@ -442,7 +442,6 @@ func vipsFlattenBackground(image *C.VipsImage, background Color) (*C.VipsImage, 
 }
 
 func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
-	var outImage *C.VipsImage
 	// Remove ICC profile metadata
 	if o.NoProfile {
 		C.remove_profile(image)
@@ -453,18 +452,30 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 		o.Interpretation = InterpretationSRGB
 	}
 	interpretation := C.VipsInterpretation(o.Interpretation)
+	colorSpaceSupported := vipsColourspaceIsSupported(image)
+	if !colorSpaceSupported && o.OutputICC == "" {
+		return image, nil
+	}
+
+	var outImage *C.VipsImage
 
 	// Apply the proper colour space
-	if vipsColourspaceIsSupported(image) {
+	if colorSpaceSupported {
 		err := C.vips_colourspace_bridge(image, &outImage, interpretation)
 		if int(err) != 0 {
+			C.g_object_unref(C.gpointer(image))
+
 			return nil, catchVipsError()
 		}
 		C.g_object_unref(C.gpointer(image))
 		image = outImage
 	}
 
-	if o.OutputICC != "" && o.InputICC != "" {
+	if o.OutputICC == "" {
+		return image, nil
+	}
+
+	if o.InputICC != "" {
 		outputIccPath := C.CString(o.OutputICC)
 		defer C.free(unsafe.Pointer(outputIccPath))
 
@@ -473,6 +484,8 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 
 		err := C.vips_icc_transform_with_default_bridge(image, &outImage, outputIccPath, inputIccPath)
 		if int(err) != 0 {
+			C.g_object_unref(C.gpointer(image))
+
 			return nil, catchVipsError()
 		}
 		C.g_object_unref(C.gpointer(image))
@@ -485,6 +498,8 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 
 		err := C.vips_icc_transform_bridge(image, &outImage, outputIccPath)
 		if int(err) != 0 {
+			C.g_object_unref(C.gpointer(image))
+
 			return nil, catchVipsError()
 		}
 		C.g_object_unref(C.gpointer(image))
@@ -495,21 +510,12 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 }
 
 func vipsSave(image *C.VipsImage, o vipsSaveOptions) ([]byte, error) {
-	defer C.g_object_unref(C.gpointer(image))
-
-	tmpImage, err := vipsPreSave(image, &o)
+	image, err := vipsPreSave(image, &o)
 	if err != nil {
 		return nil, err
 	}
 
-	// When an image has an unsupported color space, vipsPreSave
-	// returns the pointer of the image passed to it unmodified.
-	// When this occurs, we must take care to not dereference the
-	// original image a second time; we may otherwise erroneously
-	// free the object twice.
-	if tmpImage != image {
-		defer C.g_object_unref(C.gpointer(tmpImage))
-	}
+	defer C.g_object_unref(C.gpointer(image))
 
 	length := C.size_t(0)
 	saveErr := C.int(0)
@@ -526,19 +532,19 @@ func vipsSave(image *C.VipsImage, o vipsSaveOptions) ([]byte, error) {
 	var ptr unsafe.Pointer
 	switch o.Type {
 	case WEBP:
-		saveErr = C.vips_webpsave_bridge(tmpImage, &ptr, &length, strip, quality, lossless)
+		saveErr = C.vips_webpsave_bridge(image, &ptr, &length, strip, quality, lossless)
 	case PNG:
-		saveErr = C.vips_pngsave_bridge(tmpImage, &ptr, &length, strip, C.int(o.Compression), quality, interlace, palette, speed)
+		saveErr = C.vips_pngsave_bridge(image, &ptr, &length, strip, C.int(o.Compression), quality, interlace, palette, speed)
 	case TIFF:
-		saveErr = C.vips_tiffsave_bridge(tmpImage, &ptr, &length)
+		saveErr = C.vips_tiffsave_bridge(image, &ptr, &length)
 	case HEIF:
-		saveErr = C.vips_heifsave_bridge(tmpImage, &ptr, &length, strip, quality, lossless)
+		saveErr = C.vips_heifsave_bridge(image, &ptr, &length, strip, quality, lossless)
 	case AVIF:
-		saveErr = C.vips_avifsave_bridge(tmpImage, &ptr, &length, strip, quality, lossless, speed)
+		saveErr = C.vips_avifsave_bridge(image, &ptr, &length, strip, quality, lossless, speed)
 	case GIF:
-		saveErr = C.vips_gifsave_bridge(tmpImage, &ptr, &length, strip)
+		saveErr = C.vips_gifsave_bridge(image, &ptr, &length, strip)
 	default:
-		saveErr = C.vips_jpegsave_bridge(tmpImage, &ptr, &length, strip, quality, interlace)
+		saveErr = C.vips_jpegsave_bridge(image, &ptr, &length, strip, quality, interlace)
 	}
 
 	if int(saveErr) != 0 {
