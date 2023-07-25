@@ -427,6 +427,8 @@ func vipsFlattenBackground(image *C.VipsImage, background Color) (*C.VipsImage, 
 		return image, nil
 	}
 
+	defer C.g_object_unref(C.gpointer(image))
+
 	var outImage *C.VipsImage
 
 	backgroundC := [3]C.double{
@@ -438,16 +440,12 @@ func vipsFlattenBackground(image *C.VipsImage, background Color) (*C.VipsImage, 
 	err := C.vips_flatten_background_brigde(image, &outImage,
 		backgroundC[0], backgroundC[1], backgroundC[2])
 	if int(err) != 0 {
-		C.g_object_unref(C.gpointer(image))
-		C.g_object_unref(C.gpointer(outImage))
-
 		return nil, catchVipsError()
 	}
 
-	C.g_object_unref(C.gpointer(image))
 	image = outImage
 
-	return image, nil
+	return outImage, nil
 }
 
 func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
