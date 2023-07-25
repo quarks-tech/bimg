@@ -469,7 +469,6 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 			return nil, catchVipsError()
 		}
 
-		C.g_object_unref(C.gpointer(image))
 		image = outImage
 	}
 
