@@ -316,8 +316,6 @@ func extractOrEmbedImage(image *C.VipsImage, o Options) (*C.VipsImage, error) {
 	case o.Trim:
 		left, top, width, height, err := vipsTrim(image, o.Threshold)
 		if err != nil {
-			C.g_object_unref(C.gpointer(image))
-
 			return nil, err
 		}
 
@@ -413,6 +411,7 @@ func watermarkImageWithAnotherImage(image *C.VipsImage, w WatermarkImage) (*C.Vi
 	}
 
 	image, err := vipsDrawWatermark(image, w)
+
 	if err != nil {
 		return nil, err
 	}

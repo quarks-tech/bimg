@@ -398,10 +398,8 @@ func vipsColourspaceIsSupportedBuffer(buf []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	supported := vipsColourspaceIsSupported(image)
 	C.g_object_unref(C.gpointer(image))
-
-	return supported, nil
+	return vipsColourspaceIsSupported(image), nil
 }
 
 func vipsColourspaceIsSupported(image *C.VipsImage) bool {
@@ -431,14 +429,8 @@ func vipsFlattenBackground(image *C.VipsImage, background Color) (*C.VipsImage, 
 
 	var outImage *C.VipsImage
 
-	backgroundC := [3]C.double{
-		C.double(background.R),
-		C.double(background.G),
-		C.double(background.B),
-	}
-
 	err := C.vips_flatten_background_brigde(image, &outImage,
-		backgroundC[0], backgroundC[1], backgroundC[2])
+		C.double(background.R), C.double(background.G), C.double(background.B))
 	if int(err) != 0 {
 		return nil, catchVipsError()
 	}
@@ -479,7 +471,7 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 		if int(err) != 0 {
 			return nil, catchVipsError()
 		}
-		C.g_object_unref(C.gpointer(image))
+
 		return outImage, nil
 	}
 
@@ -491,7 +483,7 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 		if int(err) != 0 {
 			return nil, catchVipsError()
 		}
-		C.g_object_unref(C.gpointer(image))
+
 		image = outImage
 	}
 
@@ -618,6 +610,8 @@ func vipsTrim(image *C.VipsImage, threshold float64) (int, int, int, int, error)
 
 	err := C.vips_find_trim_bridge(image, &top, &left, &width, &height, C.double(threshold))
 	if err != 0 {
+		C.g_object_unref(C.gpointer(image))
+
 		return 0, 0, 0, 0, catchVipsError()
 	}
 
