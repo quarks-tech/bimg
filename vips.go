@@ -443,8 +443,6 @@ func vipsFlattenBackground(image *C.VipsImage, background Color) (*C.VipsImage, 
 		return nil, catchVipsError()
 	}
 
-	image = outImage
-
 	return outImage, nil
 }
 
