@@ -486,7 +486,6 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 			return nil, catchVipsError()
 		}
 
-		C.g_object_unref(C.gpointer(image))
 		image = outImage
 	}
 
@@ -525,10 +524,10 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 }
 
 func vipsSave(image *C.VipsImage, o vipsSaveOptions) ([]byte, error) {
+	defer C.g_object_unref(C.gpointer(image))
+
 	tmpImage, err := vipsPreSave(image, &o)
 	if err != nil {
-		C.g_object_unref(C.gpointer(image))
-
 		return nil, err
 	}
 
@@ -538,10 +537,8 @@ func vipsSave(image *C.VipsImage, o vipsSaveOptions) ([]byte, error) {
 	// original image a second time; we may otherwise erroneously
 	// free the object twice.
 
-	defer C.g_object_unref(C.gpointer(tmpImage))
-
 	if tmpImage != image {
-		defer C.g_object_unref(C.gpointer(image))
+		defer C.g_object_unref(C.gpointer(tmpImage))
 	}
 
 	length := C.size_t(0)
