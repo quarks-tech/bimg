@@ -255,8 +255,7 @@ func vipsExifOrientation(image *C.VipsImage) int {
 }
 
 func vipsExifShort(s string) string {
-	i := strings.Index(s, " (")
-	if i > 0 {
+	if i := strings.Index(s, " ("); i > 0 {
 		return s[:i]
 	}
 	return s
@@ -284,8 +283,7 @@ func vipsRotate(image *C.VipsImage, angle Angle) (*C.VipsImage, error) {
 	var out *C.VipsImage
 	defer C.g_object_unref(C.gpointer(image))
 
-	err := C.vips_rotate_bridge(image, &out, C.int(angle))
-	if err != 0 {
+	if err := C.vips_rotate_bridge(image, &out, C.int(angle)); err != 0 {
 		return nil, catchVipsError()
 	}
 
@@ -296,8 +294,7 @@ func vipsAutoRotate(image *C.VipsImage) (*C.VipsImage, error) {
 	var out *C.VipsImage
 	defer C.g_object_unref(C.gpointer(image))
 
-	err := C.vips_autorot_bridge(image, &out)
-	if err != 0 {
+	if err := C.vips_autorot_bridge(image, &out); err != 0 {
 		return nil, catchVipsError()
 	}
 
@@ -312,9 +309,9 @@ func vipsTransformICC(image *C.VipsImage, inputICC, outputICC string) (*C.VipsIm
 	defer C.free(unsafe.Pointer(outputIccPath))
 	inputIccPath := C.CString(inputICC)
 	defer C.free(unsafe.Pointer(inputIccPath))
-	err := C.vips_icc_transform_with_default_bridge(image, &out, outputIccPath, inputIccPath)
+
 	// err := C.vips_icc_transform_bridge2(image, &outImage, outputIccPath, inputIccPath)
-	if int(err) != 0 {
+	if err := C.vips_icc_transform_with_default_bridge(image, &out, outputIccPath, inputIccPath); int(err) != 0 {
 		return nil, catchVipsError()
 	}
 
@@ -325,8 +322,7 @@ func vipsFlip(image *C.VipsImage, direction Direction) (*C.VipsImage, error) {
 	var out *C.VipsImage
 	defer C.g_object_unref(C.gpointer(image))
 
-	err := C.vips_flip_bridge(image, &out, C.int(direction))
-	if err != 0 {
+	if err := C.vips_flip_bridge(image, &out, C.int(direction)); err != 0 {
 		return nil, catchVipsError()
 	}
 
@@ -337,8 +333,7 @@ func vipsZoom(image *C.VipsImage, zoom int) (*C.VipsImage, error) {
 	var out *C.VipsImage
 	defer C.g_object_unref(C.gpointer(image))
 
-	err := C.vips_zoom_bridge(image, &out, C.int(zoom), C.int(zoom))
-	if err != 0 {
+	if err := C.vips_zoom_bridge(image, &out, C.int(zoom), C.int(zoom)); err != 0 {
 		return nil, catchVipsError()
 	}
 
