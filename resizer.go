@@ -12,10 +12,8 @@ import (
 	"math"
 )
 
-var (
-	// ErrExtractAreaParamsRequired defines a generic extract area error
-	ErrExtractAreaParamsRequired = errors.New("extract area width/height params are required")
-)
+// ErrExtractAreaParamsRequired defines a generic extract area error
+var ErrExtractAreaParamsRequired = errors.New("extract area width/height params are required")
 
 // resizer is used to transform a given image as byte buffer
 // with the passed options.
@@ -26,13 +24,6 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	unref := true
-	defer func() {
-		if unref {
-			C.g_object_unref(C.gpointer(image))
-		}
-	}()
 
 	// Clone and define default options
 	o = applyDefaults(o, imageType)
@@ -89,14 +80,15 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 	}
 
 	// Try to use libjpeg/libwebp shrink-on-load
-	supportsShrinkOnLoad := imageType == WEBP && VipsMajorVersion >= 8 && (VipsMinorVersion >= 3 && VipsMinorVersion <= 6)
+	supportsShrinkOnLoad := imageType == WEBP && VipsMajorVersion >= 8 && VipsMinorVersion >= 3
 	supportsShrinkOnLoad = supportsShrinkOnLoad || imageType == JPEG
 	if supportsShrinkOnLoad && shrink >= 2 {
-		image, factor, err = shrinkOnLoad(buf, image, imageType, factor, shrink)
+		tmpImage, factor, err := shrinkOnLoad(buf, image, imageType, factor, shrink)
 		if err != nil {
 			return nil, err
 		}
 
+		image = tmpImage
 		factor = math.Max(factor, 1.0)
 		shrink = int(math.Floor(factor))
 		residual = float64(shrink) / factor
@@ -159,8 +151,6 @@ func resizer(buf []byte, o Options) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	unref = false
 
 	return saveImage(image, o)
 }
@@ -300,25 +290,37 @@ func extractOrEmbedImage(image *C.VipsImage, o Options) (*C.VipsImage, error) {
 
 	switch {
 	case o.Gravity == GravitySmart, o.SmartCrop:
-		return vipsSmartCrop(image, o.Width, o.Height)
+		// it's already at an appropriate size, return immediately
+		if inWidth <= o.Width && inHeight <= o.Height {
+			break
+		}
+		width := int(math.Min(float64(inWidth), float64(o.Width)))
+		height := int(math.Min(float64(inHeight), float64(o.Height)))
+		image, err = vipsSmartCrop(image, width, height)
+		break
 	case o.Crop:
+		// it's already at an appropriate size, return immediately
+		if inWidth <= o.Width && inHeight <= o.Height {
+			break
+		}
 		width := int(math.Min(float64(inWidth), float64(o.Width)))
 		height := int(math.Min(float64(inHeight), float64(o.Height)))
 		left, top := calculateCrop(inWidth, inHeight, o.Width, o.Height, o.Gravity)
 		left, top = int(math.Max(float64(left), 0)), int(math.Max(float64(top), 0))
-		return vipsExtract(image, left, top, width, height)
+		image, err = vipsExtract(image, left, top, width, height)
+		break
 	case o.Embed:
 		left, top := (o.Width-inWidth)/2, (o.Height-inHeight)/2
-		return vipsEmbed(image, left, top, o.Width, o.Height, o.Extend, o.Background)
+		image, err = vipsEmbed(image, left, top, o.Width, o.Height, o.Extend, o.Background)
+		break
 	case o.Trim:
 		left, top, width, height, err := vipsTrim(image, o.Threshold)
 		if err != nil {
-			C.g_object_unref(C.gpointer(image))
-
 			return nil, err
 		}
 
-		return vipsExtract(image, left, top, width, height)
+		image, err = vipsExtract(image, left, top, width, height)
+		break
 	case o.Top != 0 || o.Left != 0 || o.AreaWidth != 0 || o.AreaHeight != 0:
 		if o.AreaWidth == 0 {
 			o.AreaWidth = o.Width
@@ -329,10 +331,11 @@ func extractOrEmbedImage(image *C.VipsImage, o Options) (*C.VipsImage, error) {
 		if o.AreaWidth == 0 || o.AreaHeight == 0 {
 			return nil, errors.New("Extract area width/height params are required")
 		}
-		return vipsExtract(image, o.Left, o.Top, o.AreaWidth, o.AreaHeight)
+		image, err = vipsExtract(image, o.Left, o.Top, o.AreaWidth, o.AreaHeight)
+		break
 	}
 
-	return nil, err
+	return image, err
 }
 
 func rotateAndFlipImage(image *C.VipsImage, o Options) (*C.VipsImage, bool, error) {
@@ -417,8 +420,7 @@ func watermarkImageWithAnotherImage(image *C.VipsImage, w WatermarkImage) (*C.Vi
 }
 
 func imageFlatten(image *C.VipsImage, imageType ImageType, o Options) (*C.VipsImage, error) {
-	// Only PNG images are supported for now
-	if imageType != PNG || o.Background == ColorBlack {
+	if o.Background == ColorBlack {
 		return image, nil
 	}
 	return vipsFlattenBackground(image, o.Background)
@@ -572,7 +574,7 @@ func calculateRotationAndFlip(image *C.VipsImage, angle Angle) (Angle, bool) {
 	flip := false
 
 	if angle > 0 {
-		return rotate, false
+		return rotate, flip
 	}
 
 	switch vipsExifOrientation(image) {

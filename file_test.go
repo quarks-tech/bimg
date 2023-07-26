@@ -6,7 +6,6 @@ import (
 
 func TestRead(t *testing.T) {
 	buf, err := Read("testdata/test.jpg")
-
 	if err != nil {
 		t.Errorf("Cannot read the image: %#v", err)
 	}
@@ -22,7 +21,6 @@ func TestRead(t *testing.T) {
 
 func TestWrite(t *testing.T) {
 	buf, err := Read("testdata/test.jpg")
-
 	if err != nil {
 		t.Errorf("Cannot read the image: %#v", err)
 	}
